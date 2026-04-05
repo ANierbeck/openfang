@@ -3277,6 +3277,9 @@ impl OpenFangKernel {
 
     /// Kill an agent.
     pub fn kill_agent(&self, agent_id: AgentId) -> KernelResult<()> {
+        // Set state to Terminated before removal
+        let _ = self.registry.set_state(agent_id, AgentState::Terminated);
+        
         let entry = self
             .registry
             .remove(agent_id)
@@ -4513,18 +4516,25 @@ impl OpenFangKernel {
 
         self.supervisor.shutdown();
 
-        // Update agent states to Suspended in persistent storage (not delete)
+        // Only persist agents that should survive restarts
+        // Agents that were killed/terminated should not be restored on next boot
+        let mut preserved_count = 0;
         for entry in self.registry.list() {
-            let _ = self.registry.set_state(entry.id, AgentState::Suspended);
-            // Re-save with Suspended state for clean resume on next boot
-            if let Some(updated) = self.registry.get(entry.id) {
-                let _ = self.memory.save_agent(&updated);
+            // Only preserve agents that are in Running state (not killed/removed)
+            // Skip Terminated, Crashed, and Suspended agents
+            if entry.state == AgentState::Running {
+                let _ = self.registry.set_state(entry.id, AgentState::Suspended);
+                // Re-save with Suspended state for clean resume on next boot
+                if let Some(updated) = self.registry.get(entry.id) {
+                    let _ = self.memory.save_agent(&updated);
+                }
+                preserved_count += 1;
             }
         }
 
         info!(
             "OpenFang kernel shut down ({} agents preserved)",
-            self.registry.list().len()
+            preserved_count
         );
     }
 
