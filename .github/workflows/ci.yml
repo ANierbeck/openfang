@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, 'release/*', 'fix/*', 'feat/*', 'chore/*']
+    branches:
+      - "**"
   pull_request:
-    branches: [main, 'release/*', 'fix/*', 'feat/*', 'chore/*']
 
 env:
   CARGO_TERM_COLOR: always
