@@ -622,12 +622,11 @@ impl MemorySubstrate {
             .conn
             .lock()
             .map_err(|e| OpenFangError::Internal(e.to_string()))?;
-        // Execute PRAGMA wal_checkpoint to ensure WAL changes are flushed
-        conn.pragma_none("wal_checkpoint(FULL)")
-            .map_err(|e| OpenFangError::Memory(e.to_string()))?;
-        // Execute PRAGMA optimize to compact the database
-        conn.pragma_none("optimize")
-            .map_err(|e| OpenFangError::Memory(e.to_string()))?;
+        // Execute PRAGMA statements to ensure WAL changes are flushed
+        conn.execute_batch(
+            "PRAGMA wal_checkpoint(FULL);\nPRAGMA optimize;"
+        )
+        .map_err(|e: rusqlite::Error| OpenFangError::Memory(e.to_string()))?;
         Ok(())
     }
 }
