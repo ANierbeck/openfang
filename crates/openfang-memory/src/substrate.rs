@@ -614,6 +614,22 @@ impl MemorySubstrate {
         .await
         .map_err(|e| OpenFangError::Internal(e.to_string()))?
     }
+
+    /// Ensure all pending database operations are flushed to disk.
+    /// This is useful before shutdown to guarantee data consistency.
+    pub fn sync(&self) -> OpenFangResult<()> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| OpenFangError::Internal(e.to_string()))?;
+        // Execute PRAGMA wal_checkpoint to ensure WAL changes are flushed
+        conn.pragma(None, "wal_checkpoint", "FULL")
+            .map_err(|e| OpenFangError::Memory(e.to_string()))?;
+        // Execute PRAGMA optimize to compact the database
+        conn.pragma(None, "optimize", "")
+            .map_err(|e| OpenFangError::Memory(e.to_string()))?;
+        Ok(())
+    }
 }
 
 #[async_trait]

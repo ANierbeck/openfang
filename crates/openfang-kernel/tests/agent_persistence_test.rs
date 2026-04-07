@@ -51,8 +51,8 @@ api_key_env = "TEST_API_KEY"
     let agents_after_kill = kernel.registry.list();
     assert_eq!(agents_after_kill.len(), 0);
 
-    // Give the database a moment to complete the remove operation
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    // Explicitly ensure database operations are complete
+    kernel.memory.sync().ok();
 
     // Shutdown kernel (this would normally persist agents)
     kernel.shutdown();
