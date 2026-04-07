@@ -32,9 +32,9 @@ api_key_env = "TEST_API_KEY"
     };
 
     // Boot kernel and spawn agent
-    let kernel = OpenFangKernel::boot_with_config(
-        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))),
-    )
+    let kernel = OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(
+        &home_dir.join("config.toml"),
+    )))
     .unwrap();
 
     let agent_id = kernel.spawn_agent(manifest).unwrap();
@@ -55,9 +55,9 @@ api_key_env = "TEST_API_KEY"
     kernel.shutdown();
 
     // Boot a new kernel to see if killed agent is restored
-    let kernel2 = OpenFangKernel::boot_with_config(
-        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))),
-    )
+    let kernel2 = OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(
+        &home_dir.join("config.toml"),
+    )))
     .unwrap();
 
     // Verify that no agents are restored (the killed agent should not come back)
