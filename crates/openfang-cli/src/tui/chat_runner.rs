@@ -229,9 +229,6 @@ impl StandaloneChat {
             ChatAction::RejectTool(approval_id) => {
                 self.handle_approval_action(&approval_id, false);
             }
-            ChatAction::SelectApproval(idx) => {
-                self.chat.selected_approval_idx = Some(idx);
-            }
         }
     }
 

@@ -1372,9 +1372,6 @@ impl App {
             chat::ChatAction::RejectTool(approval_id) => {
                 self.handle_approval_action(&approval_id, false);
             }
-            chat::ChatAction::SelectApproval(idx) => {
-                self.chat.selected_approval_idx = Some(idx);
-            }
         }
     }
 
