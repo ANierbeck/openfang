@@ -1,7 +1,6 @@
 // Test for agent persistence fix - killed agents should not be restored on startup
 use openfang_kernel::OpenFangKernel;
 use openfang_types::agent::AgentManifest;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -34,7 +33,7 @@ api_key_env = "TEST_API_KEY"
 
     // Boot kernel and spawn agent
     let kernel = OpenFangKernel::boot_with_config(
-        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))).unwrap(),
+        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))),
     )
     .unwrap();
 
@@ -57,7 +56,7 @@ api_key_env = "TEST_API_KEY"
 
     // Boot a new kernel to see if killed agent is restored
     let kernel2 = OpenFangKernel::boot_with_config(
-        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))).unwrap(),
+        openfang_kernel::config::load_config(Some(&home_dir.join("config.toml"))),
     )
     .unwrap();
 
