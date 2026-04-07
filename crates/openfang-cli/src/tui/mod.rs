@@ -2373,20 +2373,26 @@ impl App {
 
     fn handle_approval_action(&mut self, approval_id: &str, approve: bool) {
         // Find and remove the approval from the UI
-        let approval = self.chat.pending_approvals.iter()
+        let approval = self
+            .chat
+            .pending_approvals
+            .iter()
             .find(|a| a.id == approval_id)
             .cloned();
-        
+
         if let Some(approval) = approval {
             self.chat.remove_approval(approval_id);
-            
+
             // Show feedback in the chat
             let action = if approve { "approved" } else { "rejected" };
             self.chat.push_message(
                 chat::Role::System,
-                format!("✓ {} {} for {}", approval.tool_name, action, approval.agent_id)
+                format!(
+                    "✓ {} {} for {}",
+                    approval.tool_name, action, approval.agent_id
+                ),
             );
-            
+
             // In a real implementation, you would call the kernel API here
             // to actually approve/reject the tool execution
         }

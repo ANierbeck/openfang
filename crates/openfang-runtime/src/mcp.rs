@@ -290,7 +290,11 @@ impl McpConnection {
         use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
         use rmcp::transport::StreamableHttpClientTransport;
 
-        tracing::debug!(url, "MCP connect_http called with {} headers", headers.len());
+        tracing::debug!(
+            url,
+            "MCP connect_http called with {} headers",
+            headers.len()
+        );
         Self::check_ssrf(url)?;
 
         // Parse custom headers (e.g., "Authorization: Bearer <token>").
@@ -311,9 +315,10 @@ impl McpConnection {
         // Debug: Log the headers being sent (redact sensitive headers like Authorization)
         if !custom_headers.is_empty() {
             tracing::debug!(url = %url, "MCP connect_http called with {} headers", headers.len());
-            
+
             // Log header names but redact values for sensitive headers
-            let header_logs: Vec<String> = custom_headers.iter()
+            let header_logs: Vec<String> = custom_headers
+                .iter()
                 .map(|(k, v)| {
                     let name = k.as_str();
                     if name.eq_ignore_ascii_case("authorization") {
@@ -323,7 +328,7 @@ impl McpConnection {
                     }
                 })
                 .collect();
-            
+
             tracing::debug!(url = %url, "MCP custom headers: {:?}", header_logs);
         }
 
