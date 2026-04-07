@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - "**"
   pull_request:
-    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -81,7 +81,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      - run: cargo clippy --workspace --lib --bins -- -D warnings
+      - run: cargo clippy --workspace -- -D warnings
 
   fmt:
     name: Format
@@ -96,8 +96,6 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    # Run as advisory-only so dependency advisories don't block PRs
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -119,9 +117,22 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
       - name: Scan for secrets
         run: |
-          printf 'target/\n.git/\nCargo.lock\n' > /tmp/trufflehog-exclude.txt
           trufflehog filesystem . \
             --no-update \
             --fail \
             --only-verified \
-            --exclude-paths=/tmp/trufflehog-exclude.txt
+            --exclude-paths=<(echo -e "target/\n.git/\nCargo.lock")
+
+  # ── Installer smoke test (verify install scripts from Vercel) ──────────────
+  install-smoke:
+    name: Install Script Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch and syntax-check shell installer
+        run: |
+          curl -fsSL https://openfang.sh/install -o /tmp/install.sh
+          bash -n /tmp/install.sh
+      - name: Fetch and syntax-check PowerShell installer
+        run: |
+          curl -fsSL https://openfang.sh/install.ps1 -o /tmp/install.ps1
+          pwsh -NoProfile -Command "Get-Content /tmp/install.ps1 | Out-Null" 2>&1 || true
