@@ -56,9 +56,13 @@ api_key_env = "TEST_API_KEY"
     // Kill the test agent
     kernel.kill_agent(test_agent_id).unwrap();
 
-    // Verify agent is removed from registry
+    // Verify test agent is removed from registry (other agents like "assistant" may remain)
     let agents_after_kill = kernel.registry.list();
-    assert_eq!(agents_after_kill.len(), 0);
+    let test_agent_after_kill = agents_after_kill.iter().find(|a| a.name == "test-agent");
+    assert!(
+        test_agent_after_kill.is_none(),
+        "test-agent should be removed from registry after kill"
+    );
 
     // Explicitly ensure database operations are complete
     kernel.memory.sync().ok();
