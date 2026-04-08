@@ -38,6 +38,7 @@ jobs:
 
   test:
     name: Test / ${{ matrix.os }}
+    needs: check
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -49,7 +50,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ci-${{ matrix.os }}
+          key: check-${{ matrix.os }}
       - name: Install Tauri system deps (Linux)
         if: runner.os == 'Linux'
         run: |
