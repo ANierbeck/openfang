@@ -22,9 +22,18 @@ api_key_env = "TEST_API_KEY"
 
     // Set environment variable for the test
     std::env::set_var("TEST_API_KEY", "test-key");
-    // Use canonical path for Windows compatibility
+    // Use canonical path for cross-platform compatibility
     let home_dir_str = home_dir.to_str().unwrap();
     std::env::set_var("OPENFANG_HOME", home_dir_str);
+
+    // Ensure proper file permissions on all platforms
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&home_dir).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&home_dir, perms).unwrap();
+    }
 
     // Create a simple agent manifest
     let manifest = AgentManifest {
@@ -68,10 +77,17 @@ api_key_env = "TEST_API_KEY"
     );
 
     // Explicitly ensure database operations are complete
+    // Use a small delay to ensure all async operations complete on all platforms
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     kernel.memory.sync().ok();
 
     // Shutdown kernel (this would normally persist agents)
+    // Give some time for cleanup operations to complete
     kernel.shutdown();
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    // Give some time for file system operations to complete on all platforms
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     // Boot a new kernel to see if killed agent is restored
     let kernel2 = OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(
