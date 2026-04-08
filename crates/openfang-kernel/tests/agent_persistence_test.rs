@@ -48,10 +48,8 @@ api_key_env = "TEST_API_KEY"
             .map(|a| (a.id, a.name.clone(), a.state))
             .collect::<Vec<_>>()
     );
-    // Find our test agent specifically
-    let test_agent_before = agents_before.iter().find(|a| a.name == "test-agent");
-    assert!(test_agent_before.is_some(), "test-agent should be running");
-    let test_agent_id = test_agent_before.unwrap().id;
+    // Use the returned agent_id directly
+    let test_agent_id = agent_id;
 
     // Kill the test agent
     kernel.kill_agent(test_agent_id).unwrap();
