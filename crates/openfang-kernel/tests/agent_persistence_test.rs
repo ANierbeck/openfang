@@ -43,11 +43,13 @@ api_key_env = "TEST_API_KEY"
     let agents_before = kernel.registry.list();
     eprintln!("DEBUG: Agents before kill: {:?}", 
         agents_before.iter().map(|a| (a.id, a.name.clone(), a.state)).collect::<Vec<_>>());
-    assert_eq!(agents_before.len(), 1);
-    assert_eq!(agents_before[0].name, "test-agent");
+    // Find our test agent specifically
+    let test_agent_before = agents_before.iter().find(|a| a.name == "test-agent");
+    assert!(test_agent_before.is_some(), "test-agent should be running");
+    let test_agent_id = test_agent_before.unwrap().id;
 
-    // Kill the agent
-    kernel.kill_agent(agent_id).unwrap();
+    // Kill the test agent
+    kernel.kill_agent(test_agent_id).unwrap();
 
     // Verify agent is removed from registry
     let agents_after_kill = kernel.registry.list();
@@ -65,15 +67,14 @@ api_key_env = "TEST_API_KEY"
     )))
     .unwrap();
 
-    // Verify that no agents are restored (the killed agent should not come back)
+    // Verify that the test agent is not restored (other agents like "assistant" may be present)
     let agents_after_restart = kernel2.registry.list();
     eprintln!("DEBUG: Agents after restart: {:?}", 
         agents_after_restart.iter().map(|a| (a.id, a.name.clone(), a.state)).collect::<Vec<_>>());
-    assert_eq!(
-        agents_after_restart.len(),
-        0,
-        "Killed agents should not be restored on startup. Found {} agents: {:?}",
-        agents_after_restart.len(),
+    let test_agent_after_restart = agents_after_restart.iter().find(|a| a.name == "test-agent");
+    assert!(
+        test_agent_after_restart.is_none(),
+        "Killed test-agent should not be restored on startup. Found agents: {:?}",
         agents_after_restart.iter().map(|a| (a.id, a.name.clone())).collect::<Vec<_>>()
     );
 
