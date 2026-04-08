@@ -37,11 +37,10 @@ api_key_env = "TEST_API_KEY"
     let config_path = home_dir.join("config.toml");
     eprintln!("DEBUG: Loading config from: {:?}", config_path);
     eprintln!("DEBUG: Config exists: {}", config_path.exists());
-    
-    let kernel = OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(
-        &config_path,
-    )))
-    .unwrap();
+
+    let kernel =
+        OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(&config_path)))
+            .unwrap();
 
     let agent_id = kernel.spawn_agent(manifest).unwrap();
 
@@ -114,16 +113,16 @@ async fn test_windows_compatibility() {
     // Create a simple test to verify path handling works on Windows
     let temp_dir = tempfile::tempdir().unwrap();
     let test_path = temp_dir.path().join("test.txt");
-    
+
     // Test file operations that might fail on Windows
     std::fs::write(&test_path, "test content").unwrap();
     let content = std::fs::read_to_string(&test_path).unwrap();
     assert_eq!(content, "test content");
-    
+
     // Test environment variable handling
     std::env::set_var("TEST_WINDOWS_VAR", "test_value");
     let var_value = std::env::var("TEST_WINDOWS_VAR").unwrap();
     assert_eq!(var_value, "test_value");
-    
+
     temp_dir.close().unwrap();
 }
