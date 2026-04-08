@@ -41,8 +41,13 @@ api_key_env = "TEST_API_KEY"
 
     // Verify agent is running
     let agents_before = kernel.registry.list();
-    eprintln!("DEBUG: Agents before kill: {:?}", 
-        agents_before.iter().map(|a| (a.id, a.name.clone(), a.state)).collect::<Vec<_>>());
+    eprintln!(
+        "DEBUG: Agents before kill: {:?}",
+        agents_before
+            .iter()
+            .map(|a| (a.id, a.name.clone(), a.state))
+            .collect::<Vec<_>>()
+    );
     // Find our test agent specifically
     let test_agent_before = agents_before.iter().find(|a| a.name == "test-agent");
     assert!(test_agent_before.is_some(), "test-agent should be running");
@@ -69,13 +74,21 @@ api_key_env = "TEST_API_KEY"
 
     // Verify that the test agent is not restored (other agents like "assistant" may be present)
     let agents_after_restart = kernel2.registry.list();
-    eprintln!("DEBUG: Agents after restart: {:?}", 
-        agents_after_restart.iter().map(|a| (a.id, a.name.clone(), a.state)).collect::<Vec<_>>());
+    eprintln!(
+        "DEBUG: Agents after restart: {:?}",
+        agents_after_restart
+            .iter()
+            .map(|a| (a.id, a.name.clone(), a.state))
+            .collect::<Vec<_>>()
+    );
     let test_agent_after_restart = agents_after_restart.iter().find(|a| a.name == "test-agent");
     assert!(
         test_agent_after_restart.is_none(),
         "Killed test-agent should not be restored on startup. Found agents: {:?}",
-        agents_after_restart.iter().map(|a| (a.id, a.name.clone())).collect::<Vec<_>>()
+        agents_after_restart
+            .iter()
+            .map(|a| (a.id, a.name.clone()))
+            .collect::<Vec<_>>()
     );
 
     kernel2.shutdown();
