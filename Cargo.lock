@@ -5817,8 +5817,7 @@ dependencies = [
 [[package]]
 name = "rustls-webpki"
 version = "0.103.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
+source = "git+https://github.com/rustls/webpki?rev=348ce01c01cf8ce21199090c98853992c9c047a8#348ce01c01cf8ce21199090c98853992c9c047a8"
 dependencies = [
  "aws-lc-rs",
  "ring",
