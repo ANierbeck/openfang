@@ -22,9 +22,21 @@ api_key_env = "TEST_API_KEY"
 
     // Set environment variable for the test
     std::env::set_var("TEST_API_KEY", "test-key");
-    // Use canonical path for cross-platform compatibility
-    let home_dir_str = home_dir.to_str().unwrap();
-    std::env::set_var("OPENFANG_HOME", home_dir_str);
+
+    // Windows-specific path handling
+    let home_dir_str = if cfg!(windows) {
+        // On Windows, use the verbatim path prefix to handle spaces and special characters
+        let path = home_dir.to_str().unwrap();
+        if path.contains(' ') {
+            format!(r"\\?\{}", path)
+        } else {
+            path.to_string()
+        }
+    } else {
+        home_dir.to_str().unwrap().to_string()
+    };
+
+    std::env::set_var("OPENFANG_HOME", &home_dir_str);
 
     // Ensure proper file permissions on all platforms
     #[cfg(unix)]
@@ -78,15 +90,28 @@ api_key_env = "TEST_API_KEY"
 
     // Explicitly ensure database operations are complete
     // Use a small delay to ensure all async operations complete on all platforms
+    // Windows may need more time for file operations
+    #[cfg(windows)]
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    #[cfg(not(windows))]
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
     kernel.memory.sync().ok();
 
     // Shutdown kernel (this would normally persist agents)
     // Give some time for cleanup operations to complete
+    // Windows file operations may take longer
     kernel.shutdown();
+    #[cfg(windows)]
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    #[cfg(not(windows))]
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     // Give some time for file system operations to complete on all platforms
+    // Windows may need more time for database file operations
+    #[cfg(windows)]
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+    #[cfg(not(windows))]
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     // Boot a new kernel to see if killed agent is restored
