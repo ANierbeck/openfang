@@ -155,11 +155,6 @@ openssl = { version = "0.10", features = ["vendored"] }
 tokio-test = "0.4"
 tempfile = "3"
 
-# Security patches to fix vulnerable dependencies
-[patch.crates-io]
-# Override all instances of vulnerable rustls-webpki with patched version
-rustls-webpki = { git = "https://github.com/rustls/webpki", rev = "348ce01c01cf8ce21199090c98853992c9c047a8" }
-
 [profile.release]
 lto = true
 codegen-units = 1
