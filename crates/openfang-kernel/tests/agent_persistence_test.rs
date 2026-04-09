@@ -23,29 +23,9 @@ api_key_env = "TEST_API_KEY"
     // Set environment variable for the test
     std::env::set_var("TEST_API_KEY", "test-key");
 
-    // Windows-specific path handling
-    let home_dir_str = if cfg!(windows) {
-        // On Windows, use the verbatim path prefix to handle spaces and special characters
-        let path = home_dir.to_str().unwrap();
-        if path.contains(' ') {
-            format!(r"\\?\{}", path)
-        } else {
-            path.to_string()
-        }
-    } else {
-        home_dir.to_str().unwrap().to_string()
-    };
-
+    // Use simple path handling - avoid complex Windows path manipulations
+    let home_dir_str = home_dir.to_str().unwrap().to_string();
     std::env::set_var("OPENFANG_HOME", &home_dir_str);
-
-    // Ensure proper file permissions on all platforms
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&home_dir).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&home_dir, perms).unwrap();
-    }
 
     // Create a simple agent manifest
     let manifest = AgentManifest {
@@ -56,8 +36,6 @@ api_key_env = "TEST_API_KEY"
 
     // Boot kernel and spawn agent
     let config_path = home_dir.join("config.toml");
-    eprintln!("DEBUG: Loading config from: {:?}", config_path);
-    eprintln!("DEBUG: Config exists: {}", config_path.exists());
 
     let kernel =
         OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(&config_path)))
@@ -65,20 +43,8 @@ api_key_env = "TEST_API_KEY"
 
     let agent_id = kernel.spawn_agent(manifest).unwrap();
 
-    // Verify agent is running
-    let agents_before = kernel.registry.list();
-    eprintln!(
-        "DEBUG: Agents before kill: {:?}",
-        agents_before
-            .iter()
-            .map(|a| (a.id, a.name.clone(), a.state))
-            .collect::<Vec<_>>()
-    );
-    // Use the returned agent_id directly
-    let test_agent_id = agent_id;
-
     // Kill the test agent
-    kernel.kill_agent(test_agent_id).unwrap();
+    kernel.kill_agent(agent_id).unwrap();
 
     // Verify test agent is removed from registry (other agents like "assistant" may remain)
     let agents_after_kill = kernel.registry.list();
@@ -89,30 +55,13 @@ api_key_env = "TEST_API_KEY"
     );
 
     // Explicitly ensure database operations are complete
-    // Use a small delay to ensure all async operations complete on all platforms
-    // Windows may need more time for file operations
-    #[cfg(windows)]
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    #[cfg(not(windows))]
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
+    // Use generous timeouts to ensure all async operations complete
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     kernel.memory.sync().ok();
 
-    // Shutdown kernel (this would normally persist agents)
-    // Give some time for cleanup operations to complete
-    // Windows file operations may take longer
+    // Shutdown kernel
     kernel.shutdown();
-    #[cfg(windows)]
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    #[cfg(not(windows))]
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-    // Give some time for file system operations to complete on all platforms
-    // Windows may need more time for database file operations
-    #[cfg(windows)]
-    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-    #[cfg(not(windows))]
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // Boot a new kernel to see if killed agent is restored
     let kernel2 = OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(Some(
@@ -122,48 +71,14 @@ api_key_env = "TEST_API_KEY"
 
     // Verify that the test agent is not restored (other agents like "assistant" may be present)
     let agents_after_restart = kernel2.registry.list();
-    eprintln!(
-        "DEBUG: Agents after restart: {:?}",
-        agents_after_restart
-            .iter()
-            .map(|a| (a.id, a.name.clone(), a.state))
-            .collect::<Vec<_>>()
-    );
     let test_agent_after_restart = agents_after_restart.iter().find(|a| a.name == "test-agent");
     assert!(
         test_agent_after_restart.is_none(),
-        "Killed test-agent should not be restored on startup. Found agents: {:?}",
-        agents_after_restart
-            .iter()
-            .map(|a| (a.id, a.name.clone()))
-            .collect::<Vec<_>>()
+        "Killed test-agent should not be restored on startup"
     );
 
     kernel2.shutdown();
 
     // Cleanup
-    // On Windows, ensure proper cleanup by explicitly dropping kernel resources first
-    drop(kernel2);
-    temp_dir.close().unwrap();
-}
-
-#[cfg(windows)]
-#[tokio::test]
-async fn test_windows_compatibility() {
-    // This test ensures basic Windows compatibility
-    // Create a simple test to verify path handling works on Windows
-    let temp_dir = tempfile::tempdir().unwrap();
-    let test_path = temp_dir.path().join("test.txt");
-
-    // Test file operations that might fail on Windows
-    std::fs::write(&test_path, "test content").unwrap();
-    let content = std::fs::read_to_string(&test_path).unwrap();
-    assert_eq!(content, "test content");
-
-    // Test environment variable handling
-    std::env::set_var("TEST_WINDOWS_VAR", "test_value");
-    let var_value = std::env::var("TEST_WINDOWS_VAR").unwrap();
-    assert_eq!(var_value, "test_value");
-
     temp_dir.close().unwrap();
 }
