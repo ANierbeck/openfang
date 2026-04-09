@@ -4,7 +4,10 @@ use openfang_types::agent::AgentManifest;
 use tempfile::tempdir;
 
 // Disable this test on Windows due to persistent CI failures
-// The core functionality is tested by other tests
+// TODO: Re-enable when Windows CI issues are resolved
+// The core agent kill functionality is tested sufficiently on Linux/macOS
+// Windows CI: This test is disabled to allow CI to pass while we investigate
+// the root cause of Windows-specific test failures
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_killed_agents_not_restored() {
