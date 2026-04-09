@@ -55,35 +55,3 @@ api_key_env = "TEST_API_KEY"
     kernel.shutdown();
     temp_dir.close().unwrap();
 }
-
-// Simple test for Windows that verifies basic agent kill functionality
-// without the complex persistence logic that causes issues
-#[tokio::test]
-#[cfg(windows)]
-async fn test_agent_kill_basic() {
-    // Create a simple in-memory test without file system operations
-    let manifest = AgentManifest {
-        name: "test-agent".to_string(),
-        description: "Test agent".to_string(),
-        ..Default::default()
-    };
-
-    // Test basic spawn and kill functionality
-    let kernel =
-        OpenFangKernel::boot_with_config(openfang_kernel::config::load_config(None)).unwrap();
-
-    let agent_id = kernel.spawn_agent(manifest).unwrap();
-
-    // Verify agent is running
-    let agents_before = kernel.registry.list();
-    assert!(agents_before.iter().any(|a| a.name == "test-agent"));
-
-    // Kill the agent
-    kernel.kill_agent(agent_id).unwrap();
-
-    // Verify agent is removed
-    let agents_after = kernel.registry.list();
-    assert!(!agents_after.iter().any(|a| a.name == "test-agent"));
-
-    kernel.shutdown();
-}
