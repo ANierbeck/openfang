@@ -61,7 +61,7 @@ jobs:
             librsvg2-dev \
             patchelf
       # Tests that need a display (Tauri) are skipped in headless CI via cfg
-      - run: cargo test --workspace
+      - run: cargo test --workspace -- --test-threads=4
 
   clippy:
     name: Clippy
