@@ -11,7 +11,6 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  # ── Build once, reuse cache for all subsequent jobs ────────────────────
   build:
     name: Build / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -39,7 +38,6 @@ jobs:
 
   test:
     name: Test / ${{ matrix.os }}
-    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
