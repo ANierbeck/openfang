@@ -66,7 +66,6 @@ jobs:
 
   clippy:
     name: Clippy
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +88,6 @@ jobs:
 
   fmt:
     name: Format
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +101,6 @@ jobs:
 
   audit:
     name: Security Audit
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

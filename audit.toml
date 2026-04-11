@@ -33,3 +33,5 @@ ignore = [
     "RUSTSEC-2023-0086",  # lexopt unmaintained (if present)
     "RUSTSEC-2026-0049",  # rustls-webpki CRL issue — cannot upgrade without breaking Windows compatibility
 ]
+
+# Note: RUSTSEC-2026-0095 (wasmtime) was fixed by upgrading wasmtime from 41.0.4 to 43.0.1
