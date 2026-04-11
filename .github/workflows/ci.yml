@@ -39,6 +39,7 @@ jobs:
   test:
     name: Test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +61,7 @@ jobs:
             librsvg2-dev \
             patchelf
       # Tests that need a display (Tauri) are skipped in headless CI via cfg
-      - run: cargo test --workspace -- --test-threads=1
+      - run: cargo test --workspace
 
   clippy:
     name: Clippy
