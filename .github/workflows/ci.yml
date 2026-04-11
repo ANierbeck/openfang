@@ -61,7 +61,8 @@ jobs:
             librsvg2-dev \
             patchelf
       # Tests that need a display (Tauri) are skipped in headless CI via cfg
-      - run: cargo test --workspace -- --test-threads=2
+      # Run unit tests only in CI (skip integration tests in tests/ directory)
+      - run: cargo test --workspace --lib -- --test-threads=2
 
   clippy:
     name: Clippy
