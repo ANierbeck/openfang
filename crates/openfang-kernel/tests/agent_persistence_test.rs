@@ -1,12 +1,12 @@
 // Test for agent persistence fix - killed agents should not be restored on startup
-use openfang_kernel::OpenFangKernel;
-use openfang_types::agent::AgentManifest;
-use tempfile::tempdir;
 
 // Disable on Windows due to CI issues - TODO: Re-enable when fixed
 #[tokio::test]
 #[cfg(not(windows))]
 async fn test_killed_agents_not_restored() {
+    use openfang_kernel::OpenFangKernel;
+    use openfang_types::agent::AgentManifest;
+    use tempfile::tempdir;
     // Create a temporary directory for the test
     let temp_dir = tempdir().unwrap();
     let home_dir = temp_dir.path().to_path_buf();
@@ -51,9 +51,6 @@ api_key_env = "TEST_API_KEY"
         test_agent_after_kill.is_none(),
         "test-agent should be removed from registry after kill"
     );
-
-    // Explicitly ensure database operations are complete
-    kernel.memory.sync().ok();
 
     // Shutdown kernel (this would normally persist agents)
     kernel.shutdown();
