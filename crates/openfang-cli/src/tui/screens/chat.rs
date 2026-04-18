@@ -1,5 +1,6 @@
 //! Chat screen: scrollable message history, streaming output, tool spinners, input.
 
+use crate::tui::event::ChatApproval;
 use crate::tui::theme;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -32,6 +33,7 @@ pub struct ChatMessage {
     pub role: Role,
     pub text: String,
     pub tool: Option<ToolInfo>,
+    pub approval: Option<ChatApproval>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -40,6 +42,16 @@ pub enum Role {
     Agent,
     System,
     Tool,
+}
+
+impl ChatMessage {
+    pub fn is_approval_message(&self) -> bool {
+        self.approval.is_some()
+    }
+
+    pub fn get_approval_id(&self) -> Option<&str> {
+        self.approval.as_ref().map(|a| a.id.as_str())
+    }
 }
 
 pub struct ChatState {
@@ -86,20 +98,15 @@ pub struct ChatState {
     /// Selected index in the filtered model list.
     pub model_picker_idx: usize,
     /// Pending approval requests for inline approval UI
-    pub pending_approvals: Vec<PendingApproval>,
+    pub pending_approvals: Vec<ChatApproval>,
     /// Currently selected approval for quick action (if any)
     pub selected_approval_idx: Option<usize>,
+    /// Currently selected message index for approval interaction
+    pub selected_message_idx: usize,
 }
 
-/// Approval request for inline display in chat
-#[derive(Clone)]
-pub struct PendingApproval {
-    pub id: String,
-    pub agent_id: String,
-    pub tool_name: String,
-    pub description: String,
-    pub risk_level: String,
-}
+/// Approval request for inline display in chat - alias to event::ChatApproval
+pub type PendingApproval = ChatApproval;
 
 pub enum ChatAction {
     Continue,
@@ -142,6 +149,7 @@ impl ChatState {
             model_picker_idx: 0,
             pending_approvals: Vec::new(),
             selected_approval_idx: None,
+            selected_message_idx: 0,
         }
     }
 
@@ -185,6 +193,7 @@ impl ChatState {
             role,
             text,
             tool: None,
+            approval: None,
         });
         self.scroll_offset = 0; // Auto-scroll to bottom
     }
@@ -237,6 +246,7 @@ impl ChatState {
                 result: String::new(),
                 is_error: false,
             }),
+            approval: None,
         });
         self.scroll_offset = 0;
         self.active_tool = None;
@@ -284,6 +294,23 @@ impl ChatState {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> ChatAction {
+        // Approval interaction: A for approve, R for reject
+        if !self.input.is_empty() {
+            // Don't handle approval keys when typing
+        } else if let Some(selected_idx) = self.messages.get(self.selected_message_idx) {
+            if let Some(approval) = &selected_idx.approval {
+                match key.code {
+                    KeyCode::Char('a') | KeyCode::Char('A') => {
+                        return ChatAction::ApproveTool(approval.id.clone());
+                    }
+                    KeyCode::Char('r') | KeyCode::Char('R') => {
+                        return ChatAction::RejectTool(approval.id.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             if self.show_model_picker {
                 self.show_model_picker = false;
@@ -737,11 +764,73 @@ fn draw_messages(f: &mut Frame, area: Rect, state: &ChatState) {
                 }
             }
             Role::System => {
-                for sline in msg.text.lines() {
-                    lines.push(Line::from(vec![Span::styled(
-                        format!("  {sline}"),
-                        theme::dim_style(),
-                    )]));
+                if let Some(approval) = &msg.approval {
+                    // Special rendering for approval messages
+                    use ratatui::style::{Color, Modifier};
+                    let risk_color = match approval.risk_level.to_lowercase().as_str() {
+                        "low" => Color::Green,
+                        "medium" => Color::Yellow,
+                        "high" => Color::Rgb(255, 165, 0), // Orange
+                        "critical" => Color::Red,
+                        _ => theme::TEXT_PRIMARY,
+                    };
+                    lines.push(Line::from(""));
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            "  ⚠️  ",
+                            Style::default()
+                                .fg(theme::YELLOW)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            "APPROVAL REQUIRED",
+                            Style::default()
+                                .fg(theme::YELLOW)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled("    Agent: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::raw(&approval.agent_id),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled("    Tool: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::raw(&approval.tool_name),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            "    Action: ",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(&approval.description),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled("    Risk: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(&approval.risk_level, Style::default().fg(risk_color)),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled("    ", Style::default()),
+                        Span::styled(
+                            "[A]",
+                            Style::default()
+                                .fg(theme::GREEN)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw("pprove  "),
+                        Span::styled(
+                            "[R]",
+                            Style::default().fg(theme::RED).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw("eject"),
+                    ]));
+                    lines.push(Line::from(""));
+                } else {
+                    for sline in msg.text.lines() {
+                        lines.push(Line::from(vec![Span::styled(
+                            format!("  {sline}"),
+                            theme::dim_style(),
+                        )]));
+                    }
                 }
             }
             Role::Tool => {
