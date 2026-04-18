@@ -7,7 +7,7 @@ pub mod event;
 pub mod screens;
 pub mod theme;
 
-use event::{AppEvent, BackendRef};
+use event::{AppEvent, BackendRef, ChatApproval};
 use openfang_kernel::OpenFangKernel;
 use openfang_runtime::llm_driver::StreamEvent;
 use openfang_types::agent::AgentId;
@@ -23,6 +23,53 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+
+// ── Approval Fetching ──────────────────────────────────────────────────────
+
+/// Fetch approvals from backend and send as event.
+pub async fn fetch_chat_approvals(backend: BackendRef, tx: mpsc::Sender<AppEvent>) {
+    let approvals: Vec<ChatApproval> = match backend {
+        BackendRef::InProcess(kernel) => kernel
+            .approval_manager
+            .list_pending()
+            .into_iter()
+            .map(|req| ChatApproval {
+                id: req.id.to_string(),
+                agent_id: req.agent_id,
+                tool_name: req.tool_name,
+                description: req.action_summary,
+                risk_level: format!("{:?}", req.risk_level),
+            })
+            .collect(),
+        BackendRef::Daemon(base_url) => {
+            let client = reqwest::Client::new();
+            match client
+                .get(format!("{}/api/approvals", base_url))
+                .send()
+                .await
+            {
+                Ok(response) => match response.json::<Vec<serde_json::Value>>().await {
+                    Ok(list) => list
+                        .into_iter()
+                        .filter_map(|val| {
+                            Some(ChatApproval {
+                                id: val["id"].as_str()?.to_string(),
+                                agent_id: val["agent_id"].as_str()?.to_string(),
+                                tool_name: val["tool_name"].as_str()?.to_string(),
+                                description: val["action_summary"].as_str()?.to_string(),
+                                risk_level: val["risk_level"].as_str()?.to_string(),
+                            })
+                        })
+                        .collect(),
+                    Err(_) => Vec::new(),
+                },
+                Err(_) => Vec::new(),
+            }
+        }
+    };
+
+    let _ = tx.send(AppEvent::ApprovalsFetched(approvals));
+}
 
 // ─── Core types ──────────────────────────────────────────────────────────────
 
@@ -107,6 +154,8 @@ impl Tab {
             Tab::Logs => "Logs",
         }
     }
+
+    // ── Approval Fetching ────────────────────────────────────────────────────────
 
     fn index(self) -> usize {
         TABS.iter().position(|&t| t == self).unwrap_or(0)
@@ -605,6 +654,32 @@ impl App {
             AppEvent::ExtensionReconnected(id, tools) => {
                 self.extensions.status_msg = format!("Reconnected {id}: {tools} tools");
                 self.refresh_extension_health();
+            }
+            AppEvent::ApprovalsFetched(approvals) => {
+                // Nur im Chat-Tab verarbeiten
+                if let Phase::Main = self.phase {
+                    if let Tab::Chat = self.active_tab {
+                        for approval in approvals {
+                            // Prüfen ob diese Approval bereits im Chat angezeigt wird
+                            if !self.chat.messages.iter().any(|msg| {
+                                msg.is_approval_message()
+                                    && msg.get_approval_id() == Some(&approval.id)
+                            }) {
+                                self.chat.messages.push(screens::chat::ChatMessage {
+                                    role: screens::chat::Role::System,
+                                    text: format!(
+                                        "⚠️  Approval Required: {} wants to {} [{:?}]",
+                                        approval.agent_id,
+                                        approval.description,
+                                        approval.risk_level
+                                    ),
+                                    tool: None,
+                                    approval: Some(approval),
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1225,6 +1300,17 @@ impl App {
         self.backend = Backend::InProcess { kernel };
         self.agents.reset();
         self.enter_main_phase();
+        // Start approval polling
+        if let Some(backend_ref) = self.backend.to_ref() {
+            let tx = self.event_tx.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+                loop {
+                    interval.tick().await;
+                    let _ = fetch_chat_approvals(backend_ref.clone(), tx.clone()).await;
+                }
+            });
+        }
     }
 
     fn handle_kernel_error(&mut self, err: String) {
@@ -1266,6 +1352,18 @@ impl App {
                     };
                     self.agents.reset();
                     self.enter_main_phase();
+                    // Start approval polling
+                    if let Some(backend_ref) = self.backend.to_ref() {
+                        let tx = self.event_tx.clone();
+                        tokio::spawn(async move {
+                            let mut interval =
+                                tokio::time::interval(std::time::Duration::from_secs(5));
+                            loop {
+                                interval.tick().await;
+                                let _ = fetch_chat_approvals(backend_ref.clone(), tx.clone()).await;
+                            }
+                        });
+                    }
                 }
             }
             welcome::WelcomeAction::InProcess => {
@@ -1366,6 +1464,12 @@ impl App {
             chat::ChatAction::SlashCommand(cmd) => self.handle_slash_command(&cmd),
             chat::ChatAction::OpenModelPicker => self.open_model_picker(),
             chat::ChatAction::SwitchModel(model_id) => self.switch_model(&model_id),
+            chat::ChatAction::ApproveTool(approval_id) => {
+                self.handle_approval_action(&approval_id, true);
+            }
+            chat::ChatAction::RejectTool(approval_id) => {
+                self.handle_approval_action(&approval_id, false);
+            }
         }
     }
 
@@ -2366,6 +2470,41 @@ impl App {
         let bar = Paragraph::new(Line::from(spans)).style(Style::default().bg(theme::BG_CARD));
         frame.render_widget(bar, area);
     }
+
+    fn handle_approval_action(&mut self, approval_id: &str, approve: bool) {
+        // Call the actual API to approve/reject
+        match self.backend.to_ref() {
+            Some(BackendRef::InProcess(kernel)) => {
+                if let Ok(uuid) = uuid::Uuid::parse_str(approval_id) {
+                    use openfang_types::approval::ApprovalDecision;
+                    let decision = if approve {
+                        ApprovalDecision::Approved
+                    } else {
+                        ApprovalDecision::Denied
+                    };
+                    let _ = kernel.approval_manager.resolve(uuid, decision, None);
+                }
+            }
+            Some(BackendRef::Daemon(base_url)) => {
+                let client = reqwest::blocking::Client::new();
+                let endpoint = if approve { "approve" } else { "reject" };
+                let url = format!("{}/api/approvals/{}/{}", base_url, approval_id, endpoint);
+                let _ = client.post(&url).send();
+            }
+            None => {}
+        }
+
+        // Remove the approval from the UI if it exists in either location
+        self.chat.pending_approvals.retain(|a| a.id != approval_id);
+        self.chat
+            .messages
+            .retain(|msg| msg.approval.as_ref().is_none_or(|a| a.id != approval_id));
+
+        // Show feedback in the chat
+        let action = if approve { "approved" } else { "rejected" };
+        self.chat
+            .push_message(chat::Role::System, format!("✓ Approval {}", action));
+    }
 }
 
 /// Draw a one-line toast at the bottom of the screen.
@@ -2410,6 +2549,7 @@ pub fn run(config: Option<PathBuf>) {
 
     // ── Main loop ────────────────────────────────────────────────────────────
     // Draw first, then block on events. This ensures the first frame appears
+
     // immediately, before any event processing.
     while !app.should_quit {
         terminal
