@@ -99,7 +99,6 @@ pub struct PendingApproval {
     pub tool_name: String,
     pub description: String,
     pub risk_level: String,
-    pub requested_at: String,
 }
 
 pub enum ChatAction {
@@ -115,8 +114,6 @@ pub enum ChatAction {
     ApproveTool(String),
     /// Reject a pending tool execution
     RejectTool(String),
-    /// Select an approval for quick action
-    SelectApproval(usize),
 }
 
 impl ChatState {
@@ -148,11 +145,6 @@ impl ChatState {
         }
     }
 
-    /// Add a pending approval request to the chat UI
-    pub fn add_pending_approval(&mut self, approval: PendingApproval) {
-        self.pending_approvals.push(approval);
-    }
-
     /// Remove an approval request after it's been handled
     pub fn remove_approval(&mut self, approval_id: &str) {
         self.pending_approvals.retain(|a| a.id != approval_id);
@@ -163,7 +155,8 @@ impl ChatState {
 
     /// Get the currently selected approval (if any)
     pub fn selected_approval(&self) -> Option<&PendingApproval> {
-        self.selected_approval_idx.and_then(|idx| self.pending_approvals.get(idx))
+        self.selected_approval_idx
+            .and_then(|idx| self.pending_approvals.get(idx))
     }
 
     pub fn reset(&mut self) {
@@ -489,7 +482,11 @@ pub fn draw(f: &mut Frame, area: Rect, state: &mut ChatState) {
         Constraint::Min(3),    // messages area
         Constraint::Length(1), // separator
         Constraint::Length(1), // input
-        Constraint::Length(if state.pending_approvals.is_empty() { 0 } else { 3 }), // approvals (only show if pending)
+        Constraint::Length(if state.pending_approvals.is_empty() {
+            0
+        } else {
+            3
+        }), // approvals (only show if pending)
         Constraint::Length(1), // hints
     ])
     .split(inner);
@@ -553,7 +550,10 @@ pub fn draw(f: &mut Frame, area: Rect, state: &mut ChatState) {
     } else {
         "    [Enter] Send  [Ctrl+M] Models  [\u{2191}\u{2193}] Scroll  [Esc] Back"
     };
-    let hints = Paragraph::new(Line::from(vec![Span::styled(approval_hint, theme::hint_style())]));
+    let hints = Paragraph::new(Line::from(vec![Span::styled(
+        approval_hint,
+        theme::hint_style(),
+    )]));
     f.render_widget(hints, chunks[3]);
 
     // ── Model picker overlay ────────────────────────────────────────────────
@@ -989,7 +989,9 @@ fn draw_approvals(f: &mut Frame, area: Rect, state: &ChatState) {
     let block = Block::default()
         .title(Line::from(vec![Span::styled(
             " Pending Approvals ",
-            Style::default().fg(theme::YELLOW).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme::YELLOW)
+                .add_modifier(Modifier::BOLD),
         )]))
         .borders(Borders::TOP)
         .border_style(Style::default().fg(theme::BORDER));
@@ -1019,7 +1021,10 @@ fn draw_approvals(f: &mut Frame, area: Rect, state: &ChatState) {
             Style::default().fg(risk_color).add_modifier(Modifier::BOLD),
         ));
         line_spans.push(Span::styled(
-            truncate_line(&approval.description, (inner.width as usize).saturating_sub(20)),
+            truncate_line(
+                &approval.description,
+                (inner.width as usize).saturating_sub(20),
+            ),
             Style::default().fg(theme::TEXT_PRIMARY),
         ));
 
