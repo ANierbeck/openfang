@@ -99,6 +99,7 @@ pub struct PendingApproval {
     pub tool_name: String,
     pub description: String,
     pub risk_level: String,
+    #[allow(dead_code)]
     pub requested_at: String,
 }
 
@@ -116,6 +117,7 @@ pub enum ChatAction {
     /// Reject a pending tool execution
     RejectTool(String),
     /// Select an approval for quick action
+    #[allow(dead_code)]
     SelectApproval(usize),
 }
 
@@ -149,6 +151,7 @@ impl ChatState {
     }
 
     /// Add a pending approval request to the chat UI
+    #[allow(dead_code)]
     pub fn add_pending_approval(&mut self, approval: PendingApproval) {
         self.pending_approvals.push(approval);
     }
