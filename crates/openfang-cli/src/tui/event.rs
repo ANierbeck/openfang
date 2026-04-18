@@ -36,6 +36,16 @@ pub enum BackendRef {
     InProcess(Arc<OpenFangKernel>),
 }
 
+/// Approval information for chat display.
+#[derive(Clone, Debug)]
+pub struct ChatApproval {
+    pub id: String,
+    pub agent_id: String,
+    pub tool_name: String,
+    pub description: String,
+    pub risk_level: String,
+}
+
 // ── AppEvent ────────────────────────────────────────────────────────────────
 
 /// Unified application event.
@@ -200,6 +210,8 @@ pub enum AppEvent {
     CommsSendResult(String),
     /// Comms task post result.
     CommsTaskResult(String),
+    /// Approvals for inline display in chat.
+    ApprovalsFetched(Vec<ChatApproval>),
 }
 
 /// Spawn the crossterm polling + tick thread. Returns sender + receiver.
