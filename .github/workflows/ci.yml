@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [main, 'release/*', 'fix/*', 'feat/*', 'chore/*']
   pull_request:
+    branches: [main, 'release/*', 'fix/*', 'feat/*', 'chore/*']
 
 env:
   CARGO_TERM_COLOR: always
@@ -38,7 +38,6 @@ jobs:
 
   test:
     name: Test / ${{ matrix.os }}
-    needs: build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
