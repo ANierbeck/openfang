@@ -44,7 +44,7 @@ pub async fn fetch_chat_approvals(backend: BackendRef, tx: mpsc::Sender<AppEvent
         BackendRef::Daemon(base_url) => {
             let client = reqwest::Client::new();
             match client
-                .get(&format!("{}/api/approvals", base_url))
+                .get(format!("{}/api/approvals", base_url))
                 .send()
                 .await
             {
@@ -2498,7 +2498,7 @@ impl App {
         self.chat.pending_approvals.retain(|a| a.id != approval_id);
         self.chat
             .messages
-            .retain(|msg| msg.approval.as_ref().map_or(true, |a| a.id != approval_id));
+            .retain(|msg| msg.approval.as_ref().is_none_or(|a| a.id != approval_id));
 
         // Show feedback in the chat
         let action = if approve { "approved" } else { "rejected" };
